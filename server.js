@@ -3,12 +3,24 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoute.js";
 import bookRoutes from "./routes/bookRoutes.js";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
 
 connectDB();
 
 const app = express();
+
+// rate limiting middleware
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100, // limit each IP to 100 requests
+  message: {
+    success: false,
+    message: "Too many requests, please try again later",
+  },
+});
+app.use("/api/", apiLimiter);
 
 app.use(express.json());
 

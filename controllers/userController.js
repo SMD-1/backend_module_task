@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { success, error as sendError } from "../utils/response.js";
+import logger from "../utils/logger.js";
 
 // Generate JWT token
 const generateToken = (userId) => {
@@ -13,32 +15,32 @@ const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Please provide name, email, and password" });
-    }
-
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res
-        .status(409)
-        .json({ message: "User with this email already exists" });
+      return sendError(res, 409, "User with this email already exists");
     }
 
     const user = await User.create({ name, email, password });
 
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+    return success(
+      res,
+      {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
+        token: generateToken(user._id),
       },
-      token: generateToken(user._id),
-    });
+      "User registered successfully",
+    );
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    logger.error("registerUser error: %O", error);
+    // duplicate key? (race condition)
+    if (error.code === 11000) {
+      return sendError(res, 409, "Email already in use");
+    }
+    return sendError(res, 500, "Server error");
   }
 };
 
@@ -49,28 +51,26 @@ const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Please provide email and password" });
-    }
-
     const user = await User.findOne({ email });
     if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return sendError(res, 401, "Invalid email or password");
     }
 
-    res.status(200).json({
-      message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+    return success(
+      res,
+      {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
+        token: generateToken(user._id),
       },
-      token: generateToken(user._id),
-    });
+      "Login successful",
+    );
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    logger.error("loginUser error: %O", error);
+    return sendError(res, 500, "Server error");
   }
 };
 

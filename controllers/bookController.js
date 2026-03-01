@@ -1,4 +1,6 @@
 import Book from "../models/Book.js";
+import { success, error as sendError } from "../utils/response.js";
+import logger from "../utils/logger.js";
 
 // @desc    Get all books
 // @route   GET /api/books
@@ -6,13 +8,14 @@ import Book from "../models/Book.js";
 const getAllBooks = async (req, res) => {
   try {
     const books = await Book.find().sort({ createdAt: -1 });
-    res.status(200).json({
-      message: "Books fetched successfully",
-      count: books.length,
-      books,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return success(
+      res,
+      { count: books.length, books },
+      "Books fetched successfully",
+    );
+  } catch (err) {
+    logger.error("getAllBooks error: %O", err);
+    return sendError(res, 500, "Server error");
   }
 };
 
@@ -23,14 +26,15 @@ const getBookById = async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
     if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+      return sendError(res, 404, "Book not found");
     }
-    res.status(200).json({ message: "Book fetched successfully", book });
-  } catch (error) {
-    if (error.kind === "ObjectId") {
-      return res.status(400).json({ message: "Invalid book ID format" });
+    return success(res, { book }, "Book fetched successfully");
+  } catch (err) {
+    if (err.kind === "ObjectId") {
+      return sendError(res, 400, "Invalid book ID format");
     }
-    res.status(500).json({ message: "Server error", error: error.message });
+    logger.error("getBookById error: %O", err);
+    return sendError(res, 500, "Server error");
   }
 };
 
@@ -40,17 +44,11 @@ const getBookById = async (req, res) => {
 const createBook = async (req, res) => {
   try {
     const { title, author, genre, price, inStock } = req.body;
-
-    if (!title || !author || !genre || price === undefined) {
-      return res
-        .status(400)
-        .json({ message: "Please provide title, author, genre, and price" });
-    }
-
     const book = await Book.create({ title, author, genre, price, inStock });
-    res.status(201).json({ message: "Book created successfully", book });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return success(res, { book }, "Book created successfully", 201);
+  } catch (err) {
+    logger.error("createBook error: %O", err);
+    return sendError(res, 500, "Server error");
   }
 };
 
@@ -61,22 +59,21 @@ const updateBook = async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
     if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+      return sendError(res, 404, "Book not found");
     }
 
     const updatedBook = await Book.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     });
 
-    res
-      .status(200)
-      .json({ message: "Book updated successfully", book: updatedBook });
-  } catch (error) {
-    if (error.kind === "ObjectId") {
-      return res.status(400).json({ message: "Invalid book ID format" });
+    return success(res, { book: updatedBook }, "Book updated successfully");
+  } catch (err) {
+    if (err.kind === "ObjectId") {
+      return sendError(res, 400, "Invalid book ID format");
     }
-    res.status(500).json({ message: "Server error", error: error.message });
+    logger.error("updateBook error: %O", err);
+    return sendError(res, 500, "Server error");
   }
 };
 
@@ -87,16 +84,17 @@ const deleteBook = async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
     if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+      return sendError(res, 404, "Book not found");
     }
 
     await book.deleteOne();
-    res.status(200).json({ message: "Book deleted successfully" });
-  } catch (error) {
-    if (error.kind === "ObjectId") {
-      return res.status(400).json({ message: "Invalid book ID format" });
+    return success(res, {}, "Book deleted successfully");
+  } catch (err) {
+    if (err.kind === "ObjectId") {
+      return sendError(res, 400, "Invalid book ID format");
     }
-    res.status(500).json({ message: "Server error", error: error.message });
+    logger.error("deleteBook error: %O", err);
+    return sendError(res, 500, "Server error");
   }
 };
 
